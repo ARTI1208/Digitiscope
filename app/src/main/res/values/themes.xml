@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.Digitiscope" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Digitiscope.Splashcreen" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/icon_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_screen_animated_icon</item>
+        <item name="windowSplashScreenAnimationDuration">2000</item>
+
+        <item name="postSplashScreenTheme">@style/Theme.Digitiscope.Main</item>
+    </style>
+
+    <style name="Theme.Digitiscope.Main" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>
