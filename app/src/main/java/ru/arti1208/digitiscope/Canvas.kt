@@ -475,15 +475,22 @@ fun CanvasScreen(
                                 fillMaxWidth()
                                     .weight(1f)
                                     .onSizeChanged { newSize ->
+                                        val oldSize = frameSizeState.value
                                         frameSizeState.value = newSize
-                                        if (newSize.height == 0 || newSize.width == 0) return@onSizeChanged
                                         if (frames.isEmpty()) {
                                             newFrame()
                                         } else {
+                                            if (newSize.height > oldSize.height || newSize.width > oldSize.width) return@onSizeChanged
+
                                             val oldFrames = frames.toList()
                                             frames.clear()
 
                                             frames.addAll(oldFrames.map { oldFrame ->
+                                                if (newSize.height >= oldFrame.height || newSize.width >= oldFrame.width) {
+                                                    return@map oldFrame
+                                                }
+
+                                                println("ass: $oldSize; $newSize; ${oldFrame.height} / ${oldFrame.width}")
                                                 Bitmap
                                                     .createBitmap(
                                                         oldFrame.asAndroidBitmap(),
@@ -752,8 +759,9 @@ fun PreviewRow(
     val state = rememberLazyListState()
     val scope = rememberCoroutineScope()
     LaunchedEffect(selectedIndexState.intValue) {
+        val index = selectedIndexState.intValue.takeIf { it >= 0  } ?: return@LaunchedEffect
         scope.launch {
-            state.animateScrollToItem(selectedIndexState.intValue)
+            state.animateScrollToItem(index)
         }
     }
     val background = ImageBitmap.imageResource(R.drawable.background)
