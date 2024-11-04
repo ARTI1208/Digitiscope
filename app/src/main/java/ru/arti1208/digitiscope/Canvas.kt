@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 
 package ru.arti1208.digitiscope
 
@@ -16,6 +16,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -109,6 +110,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -126,7 +128,6 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import ru.arti1208.digitiscope.model.DrawingItem
@@ -172,6 +173,11 @@ fun CanvasScreen(
     val animationDelayState = remember { mutableLongStateOf(500) }
 
     val drawingUpdater = remember { mutableIntStateOf(0) }
+
+    val zoomState = remember { mutableFloatStateOf(1f) }
+    val moveState = remember { mutableStateOf(Offset.Zero) }
+    val rotationState = remember { mutableFloatStateOf(0f) }
+    val pivotState = remember { mutableStateOf(Offset.Zero) }
 
     fun addDrawingItem(drawingItem: DrawingItem) {
         redoItems[currentFrameIndexState.intValue].clear()
@@ -246,6 +252,44 @@ fun CanvasScreen(
         currentFrameIndexState.intValue = newIndex
     }
 
+    fun draw() {
+        val bitmap = currentFrameState.value
+        drawScope.draw(
+            Density(1f),
+            LayoutDirection.Ltr,
+            currentRecordingCanvasState.value!!,
+            Size(bitmap.width.toFloat(), bitmap.height.toFloat()),
+        ) {
+            bitmap.asAndroidBitmap().eraseColor(Color.Transparent.value.toInt())
+//
+//            withTransform({
+//                val zoom = zoomState.floatValue
+//                val translationX = -moveState.value.x * zoom
+//                val translationY = -moveState.value.y * zoom
+//                translate(translationX, translationY)
+//                scale(zoom, zoom)
+//                rotate(rotationState.floatValue, pivotState.value)
+//            }) {
+
+                currentDrawingsState.value?.forEach {
+                    when (it.shape) {
+                        is DrawingShape.PathShape -> drawPath(
+                            it.shape.path,
+                            color = Color(it.color),
+                            style = Stroke(
+                                width = it.shape.strokeWidth,
+                                cap = StrokeCap.Round,
+                            ),
+                            blendMode = it.blendMode,
+                        )
+                    }
+                }
+//            }
+        }
+
+        drawingUpdater.intValue++
+    }
+
     fun generateFrames(count: Int) {
         val tools = listOf(
             Tool.Pencil,
@@ -305,8 +349,8 @@ fun CanvasScreen(
                         }
                     }
                 }
-                drawingUpdater.intValue++
             }
+            draw()
         }
     }
 
@@ -395,6 +439,9 @@ fun CanvasScreen(
                         config = config,
                         filePath = path,
                     )
+                },
+                redraw = {
+                    draw()
                 }
             )
 
@@ -462,9 +509,6 @@ fun CanvasScreen(
 //                            addDrawingItem = ::addDrawingItem,
 //                        )
 
-                        val zoomState = remember { mutableFloatStateOf(1f) }
-                        val moveState = remember { mutableStateOf(Offset.Zero) }
-
                         DrawingCanvas2(
                             modifier = Modifier.matchParentSize(),
                             colorState = colorState,
@@ -474,42 +518,13 @@ fun CanvasScreen(
                             bitmapState = currentFrameState,
                             zoomState = zoomState,
                             moveState = moveState,
+                            rotationState = rotationState,
+                            pivotState = pivotState,
                             drawingUpdater = drawingUpdater,
                             isAnimationPlaying = animationPlayingState,
                             addDrawingItem = ::addDrawingItem,
                         ) {
-                            val bitmap = currentFrameState.value
-                            drawScope.draw(
-                                Density(1f),
-                                LayoutDirection.Ltr,
-                                currentRecordingCanvasState.value!!,
-                                Size(bitmap.width.toFloat(), bitmap.height.toFloat()),
-                            ) {
-                                bitmap.asAndroidBitmap().eraseColor(Color.Transparent.value.toInt())
-
-                                withTransform({
-                                    val zoom = zoomState.floatValue
-//                                    translate(-offset.x * zoom, -offset.y * zoom)
-                                    scale(zoom, zoom)
-//                                    rotate(angle, angleCenter)
-                                }) {
-
-                                    currentDrawingsState.value?.forEach {
-                                        when (it.shape) {
-                                            is DrawingShape.PathShape -> drawPath(
-                                                it.shape.path,
-                                                color = Color(it.color),
-                                                style = Stroke(
-                                                    width = it.shape.strokeWidth,
-                                                    cap = StrokeCap.Round,
-                                                ),
-                                                blendMode = it.blendMode,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            drawingUpdater.intValue++
+                            draw()
                         }
                     }
                 }
@@ -542,7 +557,12 @@ fun CanvasScreen(
                             modifier = Modifier.fillMaxWidth(),
                             colorState = colorState,
                             toolState = toolState,
-                        )
+                        ) {
+                            zoomState.floatValue = 1f
+                            moveState.value = Offset.Zero
+                            rotationState.floatValue = 0f
+                            pivotState.value = Offset.Zero
+                        }
                     }
                 }
             }
@@ -570,225 +590,6 @@ private fun createDrawingItem(
 }
 
 @Composable
-private fun DrawingCanvas(
-    modifier: Modifier = Modifier,
-    colorState: State<Color>,
-    toolState: State<Tool>,
-    drawingState: State<SnapshotStateList<DrawingItem>?>,
-    strokeWidthState: FloatState,
-    bitmapState: State<ImageBitmap>,
-    isAnimationPlaying: State<Boolean>,
-    addDrawingItem: (DrawingItem) -> Unit,
-) {
-
-    val bitmap = bitmapState.value
-
-    val scope = remember(bitmap) { CanvasDrawScope() }
-    val canvas = remember(bitmap) { Canvas(bitmap) }
-
-
-    val back = ImageBitmap.imageResource(R.drawable.background)
-
-//    val coroutineScope = rememberCoroutineScope()
-
-    fun Offset.rotateBy(angle: Float): Offset {
-        val angleInRadians = angle * PI / 180
-        return Offset(
-            (x * cos(angleInRadians) - y * sin(angleInRadians)).toFloat(),
-            (x * sin(angleInRadians) + y * cos(angleInRadians)).toFloat(),
-        )
-    }
-
-    var offset by remember { mutableStateOf(Offset.Zero) }
-    var angleCenter by remember {
-        mutableStateOf(
-            Offset(
-                bitmap.width.toFloat() / 2,
-                bitmap.height.toFloat() / 2
-            )
-        )
-    }
-    var angle by remember { mutableFloatStateOf(0f) }
-    var zoom by remember { mutableFloatStateOf(1f) }
-
-    val fingersDown = remember { BooleanArray(10) }
-
-    var lastUpdate by remember { mutableIntStateOf(0) }
-
-    var fingersDownCount = remember { mutableIntStateOf(0) }
-
-    Canvas(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .drawBehind { drawImage(back) }
-            .run {
-                if (isAnimationPlaying.value) {
-                    this
-                } else {
-                    pointerInput(Unit) {
-
-                        coroutineScope {
-                            awaitEachGesture {
-                                if (toolState.value == Tool.Move) return@awaitEachGesture
-
-                                val paths = mutableMapOf<PointerId, Path>()
-                                val firstDownChange = awaitFirstDown(requireUnconsumed = false)
-
-                                fun getPath(id: PointerId) = paths.getOrPut(id) {
-                                    val drawingItem = createDrawingItem(
-                                        tool = toolState.value,
-                                        color = colorState.value,
-                                        width = strokeWidthState.floatValue,
-                                    )
-
-                                    addDrawingItem(drawingItem)
-
-                                    when (val shape = drawingItem.shape) {
-                                        is DrawingShape.PathShape -> shape.path
-                                    }
-                                }
-
-                                getPath(firstDownChange.id).moveTo(
-                                    firstDownChange.position.x,
-                                    firstDownChange.position.y
-                                )
-
-                                do {
-                                    val event = awaitPointerEvent()
-                                    val canceled = event.changes.fastAny { it.isConsumed }
-                                    if (!canceled) {
-                                        event.changes.fastForEach { change ->
-
-                                            if (change.pressed != change.previousPressed) {
-                                                fingersDownCount.intValue += if (change.pressed) 1 else -1
-
-                                                if (fingersDownCount.intValue >= 2) {
-                                                    return@fastForEach
-                                                }
-                                            }
-
-
-                                            if (change.pressed) {
-
-                                                val path = getPath(change.id)
-
-                                                if (change.previousPressed) {
-                                                    path.applyDrawing(
-                                                        toolState.value,
-                                                        firstDownChange.position,
-                                                        change.previousPosition,
-                                                        change.position,
-                                                    )
-                                                } else {
-                                                    path.moveTo(
-                                                        change.position.x,
-                                                        change.position.y
-                                                    )
-                                                }
-                                                lastUpdate++
-                                            }
-                                        }
-                                    }
-                                } while (!canceled && event.changes.fastAny { it.pressed } && fingersDownCount.intValue < 2)
-
-//                        paths.forEach { (_, path) ->
-//                            if (path.isEmpty.not()) {
-//
-//                                val color = if (toolState.value is Tool.Eraser) Color.White else Color.Blue
-//                                val mode = if (toolState.value is Tool.Eraser) BlendMode.Clear else BlendMode.SrcOver
-//
-//                                drawings.add(
-//                                    DrawingItem(
-//                                        DrawingShape.Line(path, strokeWidthState.floatValue),
-//                                        color.toArgb().toLong(),
-//                                        mode
-//                                    )
-//                                )
-//                            }
-//                        }
-
-                                paths.clear()
-                            }
-                        }
-
-//                        coroutineScope {
-//                            awaitEachGesture {
-//                                awaitFirstDown(requireUnconsumed = false)
-//                                do {
-//                                    val event = awaitPointerEvent()
-//                                    val canceled = event.changes.fastAny { it.isConsumed }
-//                                    if (!canceled) {
-//                                        event.changes.forEach {
-//                                            if (it.pressed != it.previousPressed) {
-//                                                fingersDownCount.intValue += if (it.pressed) 1 else -1
-//                                            }
-//                                        }
-//                                    }
-//                                } while (!canceled && event.changes.fastAny { it.pressed })
-//                            }
-//                        }
-
-                        coroutineScope {
-                            detectTransformGestures { centroid, pan, gestureZoom, rotation ->
-                                val oldScale = zoom
-                                val newScale = zoom * gestureZoom
-                                // For natural zooming and rotating, the centroid of the gesture should
-                                // be the fixed point where zooming and rotating occurs.
-                                // We compute where the centroid was (in the pre-transformed coordinate
-                                // space), and then compute where it will be after this delta.
-                                // We then compute what the new offset should be to keep the centroid
-                                // visually stationary for rotating and zooming, and also apply the pan.
-
-//                        if (gestureZoom != 1f) {
-//                            angleCenter = (angleCenter + centroid / oldScale).rotateBy(rotation) //-
-////                                (centroid / newScale + pan / oldScale)
-//                        }
-//
-//                    if (fingersDown.count() >= 2) {
-//                        offset = (offset + centroid / oldScale).rotateBy(rotation) -
-//                                (centroid / newScale + pan / oldScale)
-//                    }
-                                zoom = newScale
-//                        angle += rotation
-                            }
-                        }
-                    }
-                }
-            }
-    ) {
-        scope.draw(
-            Density(1f),
-            LayoutDirection.Ltr,
-            canvas,
-            size,
-        ) {
-            bitmap.asAndroidBitmap().eraseColor(Color.Transparent.value.toInt())
-
-            lastUpdate
-            withTransform({
-                translate(-offset.x * zoom, -offset.y * zoom)
-                scale(zoom, zoom)
-                rotate(angle, angleCenter)
-            }) {
-                drawingState.value?.forEach {
-                    when (it.shape) {
-                        is DrawingShape.PathShape -> drawPath(
-                            it.shape.path,
-                            color = Color(it.color),
-                            style = Stroke(width = it.shape.strokeWidth, cap = StrokeCap.Round),
-                            blendMode = it.blendMode
-                        )
-                    }
-                }
-            }
-        }
-
-
-        drawImage(bitmap)
-    }
-}
-
-@Composable
 private fun DrawingCanvas2(
     modifier: Modifier = Modifier,
     colorState: State<Color>,
@@ -799,6 +600,8 @@ private fun DrawingCanvas2(
     bitmapState: State<ImageBitmap>,
     zoomState: MutableFloatState,
     moveState: MutableState<Offset>,
+    rotationState: MutableFloatState,
+    pivotState: MutableState<Offset>,
     isAnimationPlaying: State<Boolean>,
     addDrawingItem: (DrawingItem) -> Unit,
     onDraw: () -> Unit,
@@ -816,24 +619,28 @@ private fun DrawingCanvas2(
     }
 
     var offset by moveState
-    var angleCenter by remember {
-        mutableStateOf(
-            Offset(
-                bitmap.width.toFloat() / 2,
-                bitmap.height.toFloat() / 2
-            )
-        )
-    }
-    var angle by remember { mutableFloatStateOf(0f) }
-//    var zoom by remember { mutableFloatStateOf(1f) }
-
-    val fingersDown = remember { BooleanArray(10) }
-
-    var lastUpdate by remember { mutableIntStateOf(0) }
-
-    var fingersDownCount = remember { mutableIntStateOf(0) }
+    val angleCenter by pivotState
+    val angle by rotationState
+    var zoom by zoomState
 
     val textMeasurer = rememberTextMeasurer()
+
+    fun Offset.withTransforms(): Offset {
+        val translatedX = x + (bitmap.width * (zoom - 1) / 2) + offset.x / 2
+        val translatedY = y + (bitmap.height * (zoom - 1) / 2) + offset.y / 2
+        val zoomedX = translatedX / zoom
+        val zoomedY = translatedY / zoom
+        val angleSin = sin(angle)
+        val angleCos = cos(angle)
+        val depivotedX = zoomedX - angleCenter.x
+        val depivotedY = zoomedY - angleCenter.y
+        val rotatedX = depivotedX * angleCos - depivotedY * angleSin
+        val rotatedY = depivotedX * angleSin + depivotedY * angleCos
+        val pivotedX = rotatedX + angleCenter.x
+        val pivotedY = rotatedY + angleCenter.y
+
+        return Offset(pivotedX, pivotedY)
+    }
 
     Canvas(
         modifier = modifier
@@ -846,7 +653,6 @@ private fun DrawingCanvas2(
                     pointerInput(toolState.value) {
 
                         if (toolState.value != Tool.Move) {
-//                            coroutineScope {
                             awaitEachGesture {
 
                                 val paths = mutableMapOf<PointerId, Path>()
@@ -866,9 +672,10 @@ private fun DrawingCanvas2(
                                     }
                                 }
 
+                                val fixed = firstDownChange.position.withTransforms()
                                 getPath(firstDownChange.id).moveTo(
-                                    firstDownChange.position.x,
-                                    firstDownChange.position.y
+                                    fixed.x,
+                                    fixed.y
                                 )
 
                                 do {
@@ -876,16 +683,6 @@ private fun DrawingCanvas2(
                                     val canceled = event.changes.fastAny { it.isConsumed }
                                     if (!canceled) {
                                         event.changes.fastForEach { change ->
-
-                                            if (change.pressed != change.previousPressed) {
-                                                fingersDownCount.intValue += if (change.pressed) 1 else -1
-
-                                                if (fingersDownCount.intValue >= 2) {
-                                                    return@fastForEach
-                                                }
-                                            }
-
-
                                             if (change.pressed) {
 
                                                 val path = getPath(change.id)
@@ -893,100 +690,66 @@ private fun DrawingCanvas2(
                                                 if (change.previousPressed) {
                                                     path.applyDrawing(
                                                         toolState.value,
-                                                        firstDownChange.position,
-                                                        change.previousPosition,
-                                                        change.position,
+                                                        firstDownChange.position.withTransforms(),
+                                                        change.previousPosition.withTransforms(),
+                                                        change.position.withTransforms(),
                                                     )
+
+                                                    val z = zoom
+                                                    val o = offset
 
                                                     onDraw()
                                                 } else {
+                                                    val p = change.position.withTransforms()
                                                     path.moveTo(
-                                                        change.position.x,
-                                                        change.position.y
+                                                        p.x,
+                                                        p.y,
                                                     )
                                                 }
-                                                lastUpdate++
                                             }
                                         }
                                     }
-                                } while (!canceled && event.changes.fastAny { it.pressed } && fingersDownCount.intValue < 2)
-
-//                        paths.forEach { (_, path) ->
-//                            if (path.isEmpty.not()) {
-//
-//                                val color = if (toolState.value is Tool.Eraser) Color.White else Color.Blue
-//                                val mode = if (toolState.value is Tool.Eraser) BlendMode.Clear else BlendMode.SrcOver
-//
-//                                drawings.add(
-//                                    DrawingItem(
-//                                        DrawingShape.Line(path, strokeWidthState.floatValue),
-//                                        color.toArgb().toLong(),
-//                                        mode
-//                                    )
-//                                )
-//                            }
-//                        }
+                                } while (!canceled && event.changes.fastAny { it.pressed })
 
                                 paths.clear()
                             }
                         }
-//                        }
-
-//                        coroutineScope {
-//                            awaitEachGesture {
-//                                awaitFirstDown(requireUnconsumed = false)
-//                                do {
-//                                    val event = awaitPointerEvent()
-//                                    val canceled = event.changes.fastAny { it.isConsumed }
-//                                    if (!canceled) {
-//                                        event.changes.forEach {
-//                                            if (it.pressed != it.previousPressed) {
-//                                                fingersDownCount.intValue += if (it.pressed) 1 else -1
-//                                            }
-//                                        }
-//                                    }
-//                                } while (!canceled && event.changes.fastAny { it.pressed })
-//                            }
-//                        }
 
                         if (toolState.value == Tool.Move) {
                             detectTransformGestures { centroid, pan, gestureZoom, rotation ->
-                                if (toolState.value != Tool.Move) return@detectTransformGestures
-                                val oldScale = zoomState.floatValue
+                                val oldScale = zoom
                                 val newScale = (oldScale * gestureZoom).coerceAtLeast(1f)
-                                // For natural zooming and rotating, the centroid of the gesture should
-                                // be the fixed point where zooming and rotating occurs.
-                                // We compute where the centroid was (in the pre-transformed coordinate
-                                // space), and then compute where it will be after this delta.
-                                // We then compute what the new offset should be to keep the centroid
-                                // visually stationary for rotating and zooming, and also apply the pan.
 
-//                        if (gestureZoom != 1f) {
-//                            angleCenter = (angleCenter + centroid / oldScale).rotateBy(rotation) //-
-////                                (centroid / newScale + pan / oldScale)
-//                        }
-//
-//                    if (fingersDown.count() >= 2) {
-                                offset = (offset + centroid / oldScale).rotateBy(rotation) -
-                                        (centroid / newScale + pan / oldScale)
-//                    }
-                                zoomState.floatValue = newScale
-//                        angle += rotation
-                                println("FAFFAFA: $angleCenter")
+                                if (gestureZoom == 1f) {
+                                    offset = ((offset + centroid / oldScale).rotateBy(rotation) -
+                                            (centroid / newScale + pan / oldScale)).let {
+                                                val maxOffsetX = (size.width * (newScale - 1)) / 2
+                                                val maxOffsetY = (size.height * (newScale - 1)) / 2
+                                                Offset(
+                                                    it.x.coerceIn(-maxOffsetX, maxOffsetX),
+                                                    it.y.coerceIn(-maxOffsetY, maxOffsetY),
+                                                )
+                                    }
+                                }
+                                zoom = newScale
                             }
-//                            }
                         }
                     }
                 }
             }
     ) {
         withTransform({
-            scale(zoomState.floatValue, zoomState.floatValue)
+            val translationX = -offset.x * zoom
+            val translationY = -offset.y * zoom
+            translate(translationX, translationY)
+            scale(zoom, zoom)
+            rotate(rotationState.floatValue, pivotState.value)
         }) {
             previousBitmap?.also { drawImage(it, alpha = 0.2f) }
             drawImage(bitmap)
         }
-        drawText(textMeasurer, drawingUpdater.intValue.toString())
+        // for redrawing
+        drawText(textMeasurer, drawingUpdater.intValue.toString(), style = TextStyle(color = Color.Transparent))
     }
 }
 
@@ -1052,6 +815,7 @@ fun ControlsRow(
     deleteAllFrames: () -> Unit,
     export: (config: GifConfig) -> Unit,
     save: (config: GifConfig, path: String) -> Unit,
+    redraw: () -> Unit,
 ) {
     LazyRow(
         modifier = modifier,
@@ -1072,6 +836,7 @@ fun ControlsRow(
                     IconButton(enabled = undoItems.isNullOrEmpty().not(), onClick = {
                         val historyItem = undoItems?.removeFromEnd() ?: return@IconButton
                         redoItems?.add(historyItem)
+                        redraw()
                     }) {
                         Icon(Icons.AutoMirrored.Default.Undo, contentDescription = "Undo")
                     }
@@ -1079,6 +844,7 @@ fun ControlsRow(
                     IconButton(enabled = redoItems.isNullOrEmpty().not(), onClick = {
                         val historyItem = redoItems?.removeFromEnd() ?: return@IconButton
                         undoItems?.add(historyItem)
+                        redraw()
                     }) {
                         Icon(Icons.AutoMirrored.Default.Redo, contentDescription = "Redo")
                     }
@@ -1241,6 +1007,7 @@ fun ToolsRow(
     modifier: Modifier,
     colorState: MutableState<Color>,
     toolState: MutableState<Tool>,
+    clearTransforms: () -> Unit,
 ) {
 
     val showColorPickerState = remember { mutableStateOf(false) }
@@ -1286,7 +1053,12 @@ fun ToolsRow(
                     } else {
                         this
                     }
-                }, onClick = { toolState.value = tool }) {
+                }, onClick = {
+                    if (toolState.value == Tool.Move && tool == Tool.Move) {
+                        clearTransforms()
+                    }
+                    toolState.value = tool
+                }) {
                     Icon(icon, contentDescription = description)
                 }
             }
