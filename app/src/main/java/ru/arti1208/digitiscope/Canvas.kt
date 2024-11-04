@@ -1,16 +1,9 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class)
 
 package ru.arti1208.digitiscope
 
-import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.ComposeShader
-import android.graphics.PorterDuff
-import android.net.Uri
 import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandIn
@@ -32,12 +25,9 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -50,35 +40,23 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Circle
-import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.GeneratingTokens
-import androidx.compose.material.icons.outlined.Moving
 import androidx.compose.material.icons.outlined.Pause
-import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Rectangle
-import androidx.compose.material.icons.outlined.RoundedCorner
-import androidx.compose.material.icons.outlined.ShapeLine
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Square
-import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.FloatState
 import androidx.compose.runtime.IntState
@@ -103,17 +81,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
-import androidx.compose.ui.graphics.LinearGradientShader
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -136,7 +113,6 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -149,71 +125,18 @@ import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import androidx.core.content.FileProvider
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
-import java.io.OutputStream
+import ru.arti1208.digitiscope.model.DrawingItem
+import ru.arti1208.digitiscope.model.DrawingShape
+import ru.arti1208.digitiscope.model.Tool
 import kotlin.math.PI
 import kotlin.math.cos
-import kotlin.math.max
 import kotlin.math.sin
 import kotlin.random.Random
 import kotlin.collections.removeLast as removeFromEnd
-
-
-sealed interface DrawingShape {
-
-    data class PathShape(
-        val path: Path,
-        val strokeWidth: Float,
-    ) : DrawingShape
-}
-
-data class DrawingItem(
-    val shape: DrawingShape,
-    val color: Long,
-    val blendMode: BlendMode = BlendMode.SrcOver,
-)
-
-sealed interface Tool {
-    data object Move : Tool
-    data object Pencil : Tool
-    data object Eraser : Tool
-
-    sealed interface Shape : Tool {
-        data object Line : Shape
-        data object Rectangle : Shape
-        data object Square : Shape
-        data object Oval : Shape
-        data object Circle : Shape
-    }
-}
-
-enum class PaintOption {
-    FILLED,
-}
-
-private fun createNewBitmap(size: IntSize) = ImageBitmap(size.width, size.height)
-
-private fun Random.nextFloat(from: Float, until: Float) =
-    nextInt(from.toInt(), until.toInt()) + nextFloat() // TODO approximation
-
-private fun <T> Random.nextItem(list: List<T>) = list[nextInt(list.size)]
-
-private fun <T> List<T>.random() = Random.nextItem(this)
-
-const val MIN_STROKE_WIDTH = 1f
-const val MAX_STROKE_WIDTH = 300f
-
-const val MIN_DELAY_MS = 20f
-const val MAX_DELAY_MS = 5000f
 
 @Composable
 fun CanvasScreen(
@@ -274,7 +197,7 @@ fun CanvasScreen(
 
     fun newFrame() {
         val newIndex = currentFrameIndexState.intValue + 1
-        val newFrame = createNewBitmap(frameSizeState.value)
+        val newFrame = ImageBitmap(frameSizeState.value)
         insertFrame(
             index = newIndex,
             frame = newFrame,
@@ -514,11 +437,13 @@ fun CanvasScreen(
                                             frames.clear()
 
                                             frames.addAll(oldFrames.map { oldFrame ->
-                                                Bitmap.createBitmap(
-                                                    oldFrame.asAndroidBitmap(),
-                                                    0, 0,
-                                                    newSize.width, newSize.height,
-                                                ).asImageBitmap()
+                                                Bitmap
+                                                    .createBitmap(
+                                                        oldFrame.asAndroidBitmap(),
+                                                        0, 0,
+                                                        newSize.width, newSize.height,
+                                                    )
+                                                    .asImageBitmap()
                                             })
                                         }
                                     }
@@ -563,7 +488,7 @@ fun CanvasScreen(
                                 bitmap.asAndroidBitmap().eraseColor(Color.Transparent.value.toInt())
 
                                 withTransform({
-                                    val zoom = zoomState.value
+                                    val zoom = zoomState.floatValue
 //                                    translate(-offset.x * zoom, -offset.y * zoom)
                                     scale(zoom, zoom)
 //                                    rotate(angle, angleCenter)
@@ -599,7 +524,6 @@ fun CanvasScreen(
                             modifier = Modifier.padding(vertical = 4.dp),
                             images = frames,
                             selectedIndexState = currentFrameIndexState,
-                            newFrame = ::newFrame,
                         )
 
                         Slider(
@@ -622,53 +546,6 @@ fun CanvasScreen(
                     }
                 }
             }
-        }
-    }
-}
-
-private fun saveGif(
-    context: Context,
-    coroutineScope: CoroutineScope,
-    frames: List<ImageBitmap>,
-    delay: Int,
-    config: GifConfig,
-    filePath: String,
-) {
-    coroutineScope.launch(Dispatchers.IO) {
-        context.contentResolver.openOutputStream(Uri.parse(filePath))?.use { stream ->
-            stream.writeGif(frames, delay, config)
-        }
-    }
-}
-
-private fun exportGif(
-    context: Context,
-    coroutineScope: CoroutineScope,
-    frames: List<ImageBitmap>,
-    delay: Int,
-    config: GifConfig,
-) {
-    coroutineScope.launch(Dispatchers.IO) {
-        val filesDir = context.applicationContext.filesDir
-        val exportDir = File(filesDir, "export").also { it.mkdirs() }
-        val imageFile = File(exportDir, "Digitiscope.gif")
-
-        FileOutputStream(imageFile).use { stream ->
-            stream.writeGif(frames, delay, config)
-        }
-
-        val authority = BuildConfig.APPLICATION_ID + ".ExportProvider"
-        val imageUri = FileProvider.getUriForFile(context, authority, imageFile)
-
-        val exportIntent = Intent(Intent.ACTION_SEND).apply {
-            setType("image/gif")
-            setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            putExtra(Intent.EXTRA_STREAM, imageUri)
-        }
-        val chooser = Intent.createChooser(exportIntent, "Share GIF")
-
-        withContext(Dispatchers.Main) {
-            context.startActivity(chooser)
         }
     }
 }
@@ -736,7 +613,7 @@ private fun DrawingCanvas(
 
     val fingersDown = remember { BooleanArray(10) }
 
-    var lastUpdate by remember { mutableStateOf(0) }
+    var lastUpdate by remember { mutableIntStateOf(0) }
 
     var fingersDownCount = remember { mutableIntStateOf(0) }
 
@@ -776,7 +653,6 @@ private fun DrawingCanvas(
                                     firstDownChange.position.y
                                 )
 
-                                println("Starttt at ${firstDownChange.position}")
                                 do {
                                     val event = awaitPointerEvent()
                                     val canceled = event.changes.fastAny { it.isConsumed }
@@ -853,9 +729,9 @@ private fun DrawingCanvas(
 //                        }
 
                         coroutineScope {
-                            detectTransformGestures { centroid, pan, gestZoom, rotation ->
+                            detectTransformGestures { centroid, pan, gestureZoom, rotation ->
                                 val oldScale = zoom
-                                val newScale = zoom * gestZoom
+                                val newScale = zoom * gestureZoom
                                 // For natural zooming and rotating, the centroid of the gesture should
                                 // be the fixed point where zooming and rotating occurs.
                                 // We compute where the centroid was (in the pre-transformed coordinate
@@ -863,7 +739,7 @@ private fun DrawingCanvas(
                                 // We then compute what the new offset should be to keep the centroid
                                 // visually stationary for rotating and zooming, and also apply the pan.
 
-//                        if (gestZoom != 1f) {
+//                        if (gestureZoom != 1f) {
 //                            angleCenter = (angleCenter + centroid / oldScale).rotateBy(rotation) //-
 ////                                (centroid / newScale + pan / oldScale)
 //                        }
@@ -874,7 +750,6 @@ private fun DrawingCanvas(
 //                    }
                                 zoom = newScale
 //                        angle += rotation
-                                println("FAFFAFA: $angleCenter")
                             }
                         }
                     }
@@ -910,54 +785,6 @@ private fun DrawingCanvas(
 
 
         drawImage(bitmap)
-    }
-}
-
-fun Path.applyDrawing(
-    tool: Tool,
-    originalOffset: Offset,
-    previousOffset: Offset,
-    lastOffset: Offset,
-) {
-    when (tool) {
-        Tool.Move -> Unit
-        Tool.Pencil, Tool.Eraser -> {
-            quadraticTo(
-                previousOffset.x,
-                previousOffset.y,
-                (previousOffset.x + lastOffset.x) / 2,
-                (previousOffset.y + lastOffset.y) / 2,
-            )
-        }
-
-        is Tool.Shape -> {
-            reset()
-            moveTo(originalOffset.x, originalOffset.y)
-            when (tool) {
-                Tool.Shape.Line -> lineTo(
-                    lastOffset.x,
-                    lastOffset.y
-                )
-
-                Tool.Shape.Oval -> addOval(Rect(originalOffset, lastOffset))
-                Tool.Shape.Circle -> addOval(
-                    Rect(originalOffset, lastOffset.run {
-                        max(x - originalOffset.x, y - originalOffset.y)
-                    })
-                )
-
-                Tool.Shape.Rectangle -> addRect(Rect(originalOffset, lastOffset))
-                Tool.Shape.Square -> addRect(
-                    Rect(originalOffset, lastOffset.run {
-                        val length = max(
-                            x - originalOffset.x,
-                            y - originalOffset.y,
-                        )
-                        Size(length, length)
-                    })
-                )
-            }
-        }
     }
 }
 
@@ -1002,7 +829,7 @@ private fun DrawingCanvas2(
 
     val fingersDown = remember { BooleanArray(10) }
 
-    var lastUpdate by remember { mutableStateOf(0) }
+    var lastUpdate by remember { mutableIntStateOf(0) }
 
     var fingersDownCount = remember { mutableIntStateOf(0) }
 
@@ -1020,69 +847,69 @@ private fun DrawingCanvas2(
 
                         if (toolState.value != Tool.Move) {
 //                            coroutineScope {
-                                awaitEachGesture {
+                            awaitEachGesture {
 
-                                    val paths = mutableMapOf<PointerId, Path>()
-                                    val firstDownChange = awaitFirstDown(requireUnconsumed = false)
+                                val paths = mutableMapOf<PointerId, Path>()
+                                val firstDownChange = awaitFirstDown(requireUnconsumed = false)
 
-                                    fun getPath(id: PointerId) = paths.getOrPut(id) {
-                                        val drawingItem = createDrawingItem(
-                                            tool = toolState.value,
-                                            color = colorState.value,
-                                            width = strokeWidthState.floatValue,
-                                        )
-
-                                        addDrawingItem(drawingItem)
-
-                                        when (val shape = drawingItem.shape) {
-                                            is DrawingShape.PathShape -> shape.path
-                                        }
-                                    }
-
-                                    getPath(firstDownChange.id).moveTo(
-                                        firstDownChange.position.x,
-                                        firstDownChange.position.y
+                                fun getPath(id: PointerId) = paths.getOrPut(id) {
+                                    val drawingItem = createDrawingItem(
+                                        tool = toolState.value,
+                                        color = colorState.value,
+                                        width = strokeWidthState.floatValue,
                                     )
 
-                                    do {
-                                        val event = awaitPointerEvent()
-                                        val canceled = event.changes.fastAny { it.isConsumed }
-                                        if (!canceled) {
-                                            event.changes.fastForEach { change ->
+                                    addDrawingItem(drawingItem)
 
-                                                if (change.pressed != change.previousPressed) {
-                                                    fingersDownCount.intValue += if (change.pressed) 1 else -1
+                                    when (val shape = drawingItem.shape) {
+                                        is DrawingShape.PathShape -> shape.path
+                                    }
+                                }
 
-                                                    if (fingersDownCount.intValue >= 2) {
-                                                        return@fastForEach
-                                                    }
-                                                }
+                                getPath(firstDownChange.id).moveTo(
+                                    firstDownChange.position.x,
+                                    firstDownChange.position.y
+                                )
 
+                                do {
+                                    val event = awaitPointerEvent()
+                                    val canceled = event.changes.fastAny { it.isConsumed }
+                                    if (!canceled) {
+                                        event.changes.fastForEach { change ->
 
-                                                if (change.pressed) {
+                                            if (change.pressed != change.previousPressed) {
+                                                fingersDownCount.intValue += if (change.pressed) 1 else -1
 
-                                                    val path = getPath(change.id)
-
-                                                    if (change.previousPressed) {
-                                                        path.applyDrawing(
-                                                            toolState.value,
-                                                            firstDownChange.position,
-                                                            change.previousPosition,
-                                                            change.position,
-                                                        )
-
-                                                        onDraw()
-                                                    } else {
-                                                        path.moveTo(
-                                                            change.position.x,
-                                                            change.position.y
-                                                        )
-                                                    }
-                                                    lastUpdate++
+                                                if (fingersDownCount.intValue >= 2) {
+                                                    return@fastForEach
                                                 }
                                             }
+
+
+                                            if (change.pressed) {
+
+                                                val path = getPath(change.id)
+
+                                                if (change.previousPressed) {
+                                                    path.applyDrawing(
+                                                        toolState.value,
+                                                        firstDownChange.position,
+                                                        change.previousPosition,
+                                                        change.position,
+                                                    )
+
+                                                    onDraw()
+                                                } else {
+                                                    path.moveTo(
+                                                        change.position.x,
+                                                        change.position.y
+                                                    )
+                                                }
+                                                lastUpdate++
+                                            }
                                         }
-                                    } while (!canceled && event.changes.fastAny { it.pressed } && fingersDownCount.intValue < 2)
+                                    }
+                                } while (!canceled && event.changes.fastAny { it.pressed } && fingersDownCount.intValue < 2)
 
 //                        paths.forEach { (_, path) ->
 //                            if (path.isEmpty.not()) {
@@ -1100,9 +927,9 @@ private fun DrawingCanvas2(
 //                            }
 //                        }
 
-                                    paths.clear()
-                                }
+                                paths.clear()
                             }
+                        }
 //                        }
 
 //                        coroutineScope {
@@ -1123,35 +950,30 @@ private fun DrawingCanvas2(
 //                        }
 
                         if (toolState.value == Tool.Move) {
-//                            return@pointerInput
-                            println("FAFFAFA: move")
-//                            coroutineScope {
-                                println("FAFFAFA: scope in")
-                                detectTransformGestures { centroid, pan, gestZoom, rotation ->
-                                    println("FAFFAFA: detected")
-                                    if (toolState.value != Tool.Move) return@detectTransformGestures
-                                    val oldScale = zoomState.floatValue
-                                    val newScale = (oldScale * gestZoom).coerceAtLeast(1f)
-                                    // For natural zooming and rotating, the centroid of the gesture should
-                                    // be the fixed point where zooming and rotating occurs.
-                                    // We compute where the centroid was (in the pre-transformed coordinate
-                                    // space), and then compute where it will be after this delta.
-                                    // We then compute what the new offset should be to keep the centroid
-                                    // visually stationary for rotating and zooming, and also apply the pan.
+                            detectTransformGestures { centroid, pan, gestureZoom, rotation ->
+                                if (toolState.value != Tool.Move) return@detectTransformGestures
+                                val oldScale = zoomState.floatValue
+                                val newScale = (oldScale * gestureZoom).coerceAtLeast(1f)
+                                // For natural zooming and rotating, the centroid of the gesture should
+                                // be the fixed point where zooming and rotating occurs.
+                                // We compute where the centroid was (in the pre-transformed coordinate
+                                // space), and then compute where it will be after this delta.
+                                // We then compute what the new offset should be to keep the centroid
+                                // visually stationary for rotating and zooming, and also apply the pan.
 
-//                        if (gestZoom != 1f) {
+//                        if (gestureZoom != 1f) {
 //                            angleCenter = (angleCenter + centroid / oldScale).rotateBy(rotation) //-
 ////                                (centroid / newScale + pan / oldScale)
 //                        }
 //
 //                    if (fingersDown.count() >= 2) {
-                        offset = (offset + centroid / oldScale).rotateBy(rotation) -
-                                (centroid / newScale + pan / oldScale)
+                                offset = (offset + centroid / oldScale).rotateBy(rotation) -
+                                        (centroid / newScale + pan / oldScale)
 //                    }
-                                    zoomState.floatValue = newScale
+                                zoomState.floatValue = newScale
 //                        angle += rotation
-                                    println("FAFFAFA: $angleCenter")
-                                }
+                                println("FAFFAFA: $angleCenter")
+                            }
 //                            }
                         }
                     }
@@ -1173,7 +995,6 @@ fun PreviewRow(
     modifier: Modifier = Modifier,
     images: SnapshotStateList<ImageBitmap>,
     selectedIndexState: MutableIntState,
-    newFrame: () -> Unit,
 ) {
     val state = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -1335,13 +1156,19 @@ fun ControlsRow(
                     IconButton(onClick = {
                         deleteCurrentFrame()
                     }) {
-                        Icon(painterResource(R.drawable.delete_frame), contentDescription = "Delete")
+                        Icon(
+                            painterResource(R.drawable.delete_frame),
+                            contentDescription = "Delete"
+                        )
                     }
 
                     IconButton(onClick = {
                         deleteAllFrames()
                     }) {
-                        Icon(painterResource(R.drawable.delete_all), contentDescription = "Delete all")
+                        Icon(
+                            painterResource(R.drawable.delete_all),
+                            contentDescription = "Delete all"
+                        )
                     }
                 }
             }
@@ -1376,166 +1203,6 @@ fun ControlsRow(
     }
 }
 
-data class GifConfig(
-    val background: Background,
-    val isCyclic: Boolean,
-)
-
-@Composable
-fun ExportDialog(
-    isShowingState: MutableState<Boolean>,
-    animationDelayState: MutableLongState,
-    export: (config: GifConfig) -> Unit,
-    save: (config: GifConfig, path: String) -> Unit,
-) {
-    AnimatedVisibility(isShowingState.value) {
-        BasicAlertDialog(
-            onDismissRequest = { isShowingState.value = false },
-        ) {
-            Surface(shape = RoundedCornerShape(8.dp)) {
-
-                Column(
-                    modifier = Modifier.padding(vertical = 4.dp, horizontal = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-
-                    val editorBackground = ImageBitmap.imageResource(R.drawable.background)
-
-                    var isBackgroundFromEditor by remember { mutableStateOf(true) }
-                    val backgroundColorState = remember { mutableStateOf(Color.White) }
-                    val colorPickerShowingState = remember { mutableStateOf(false) }
-
-                    ColorPickerBottomSheet(colorPickerShowingState, backgroundColorState)
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-
-                        IconButton(onClick = {
-                            isBackgroundFromEditor = true
-                        }) {
-                            Box(
-                                Modifier
-                                    .size(64.dp)
-                                    .clip(CircleShape)
-                                    .run {
-                                        if (isBackgroundFromEditor) {
-                                            border(1.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                        } else {
-                                            this
-                                        }
-                                    }
-                                    .drawBehind {
-                                        drawImage(editorBackground)
-                                    }
-                            )
-                        }
-
-
-
-                        ColoredCircleButton(
-                            buttonSize = 64.dp,
-                            color = backgroundColorState.value,
-                            borderColor = if (!isBackgroundFromEditor) MaterialTheme.colorScheme.onSurface else Color.Transparent,
-                            onClick = {
-                                isBackgroundFromEditor = false
-                               colorPickerShowingState.value = true
-                            },
-                        )
-
-                    }
-
-                    Text(if (isBackgroundFromEditor) "Use editor background" else "Color background")
-
-                    Slider(
-                        value = 1000f / animationDelayState.longValue,
-                        onValueChange = { animationDelayState.longValue = (1000f / it).toLong() },
-                        valueRange = (1000f / MAX_DELAY_MS)..(1000f / MIN_DELAY_MS)
-                    )
-
-                    Text("Animation speed", fontSize = 10.sp)
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp, alignment = Alignment.End),
-                    ) {
-                        val saveFile = rememberLauncherForActivityResult(
-                            ActivityResultContracts.CreateDocument("image/gif")
-                        ) {
-                            val uriPath = it?.toString() ?: return@rememberLauncherForActivityResult
-                            isShowingState.value = false
-
-                            val background = when (isBackgroundFromEditor) {
-                                true -> Background.BitmapBackground(editorBackground)
-                                false -> Background.ColorBackground(backgroundColorState.value)
-                            }
-
-                            save(GifConfig(background, isCyclic = true), uriPath)
-                        }
-
-                        TextButton(onClick = {
-                            saveFile.launch("Digitiscope.gif")
-                        }) {
-                            Text("Save to file")
-                        }
-
-                        TextButton(onClick = {
-                            isShowingState.value = false
-
-                            val background = when (isBackgroundFromEditor) {
-                                true -> Background.BitmapBackground(editorBackground)
-                                false -> Background.ColorBackground(backgroundColorState.value)
-                            }
-
-                            export(GifConfig(background, isCyclic = true))
-                        }) {
-                            Text("Share")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-sealed interface Background {
-    data class BitmapBackground(val bitmap: ImageBitmap) : Background
-
-    data class ColorBackground(val color: Color): Background
-}
-
-fun OutputStream.writeGif(
-    frames: List<ImageBitmap>,
-    delay: Int,
-    config: GifConfig,
-) {
-    val encoder = AnimatedGifEncoder().apply {
-        setRepeat(if (config.isCyclic) 0 else 1)
-        setDelay(delay)
-    }
-    encoder.start(this)
-
-    frames.forEach { frame ->
-        val frameWithBackground = ImageBitmap(frame.width, frame.height)
-        val drawScope = CanvasDrawScope()
-        val canvas = Canvas(frameWithBackground)
-        drawScope.draw(
-            Density(1f),
-            LayoutDirection.Ltr,
-            canvas,
-            Size(frameWithBackground.width.toFloat(), frameWithBackground.height.toFloat()),
-        ) {
-            when (val background = config.background) {
-                is Background.BitmapBackground -> drawImage(background.bitmap)
-                is Background.ColorBackground -> drawRect(background.color)
-            }
-            drawImage(frame)
-        }
-
-        encoder.addFrame(frameWithBackground.asAndroidBitmap())
-    }
-
-    encoder.finish()
-}
-
 @Composable
 fun GenerateFrames(
     modifier: Modifier,
@@ -1543,14 +1210,19 @@ fun GenerateFrames(
 ) {
     Column(modifier, horizontalAlignment = Alignment.End) {
         var frameCountString by remember { mutableStateOf("") }
+        val focusRequester = remember { FocusRequester() }
         TextField(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
             value = frameCountString,
             onValueChange = { frameCountString = it },
             singleLine = true,
             readOnly = false,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
+
+        LaunchedEffect(Unit) {
+            focusRequester.requestFocus()
+        }
 
         TextButton(
             enabled = frameCountString.toIntOrNull()?.takeIf { it > 0 } != null,
@@ -1589,11 +1261,23 @@ fun ToolsRow(
             listOf(
                 ToolButtonData(Tool.Move, ImageVector.vectorResource(R.drawable.move), "Move"),
                 ToolButtonData(Tool.Pencil, Icons.Outlined.Edit, "Pencil"),
-                ToolButtonData(Tool.Eraser, ImageVector.vectorResource(R.drawable.eraser), "Eraser"),
-                ToolButtonData(Tool.Shape.Line, ImageVector.vectorResource(R.drawable.line), "Line"),
+                ToolButtonData(
+                    Tool.Eraser,
+                    ImageVector.vectorResource(R.drawable.eraser),
+                    "Eraser"
+                ),
+                ToolButtonData(
+                    Tool.Shape.Line,
+                    ImageVector.vectorResource(R.drawable.line),
+                    "Line"
+                ),
                 ToolButtonData(Tool.Shape.Rectangle, Icons.Outlined.Rectangle, "Rectangle"),
                 ToolButtonData(Tool.Shape.Square, Icons.Outlined.Square, "Square"),
-                ToolButtonData(Tool.Shape.Oval, ImageVector.vectorResource(R.drawable.oval), "Oval"),
+                ToolButtonData(
+                    Tool.Shape.Oval,
+                    ImageVector.vectorResource(R.drawable.oval),
+                    "Oval"
+                ),
                 ToolButtonData(Tool.Shape.Circle, Icons.Outlined.Circle, "Circle"),
             ).forEach { (tool, icon, description) ->
                 IconButton(modifier = Modifier.run {
@@ -1615,228 +1299,3 @@ data class ToolButtonData(
     val image: ImageVector,
     val description: String,
 )
-
-@Composable
-fun ColorPickerBottomSheet(
-    showColorPickerState: MutableState<Boolean>,
-    colorState: MutableState<Color>,
-) {
-    if (!showColorPickerState.value) return
-    val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(sheetState = state, onDismissRequest = { showColorPickerState.value = false }) {
-        ColorPicker(Modifier, colorState)
-    }
-}
-
-@Composable
-fun ColorPicker(
-    modifier: Modifier,
-    colorState: MutableState<Color>,
-) {
-    Column(
-        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-
-        FlowRow {
-            ColoredCircleButton(
-                color = colorState.value,
-                borderColor = Color.Transparent,
-                onClick = { },
-            )
-        }
-
-        val staValSize = remember { mutableStateOf(IntSize.Zero) }
-
-        val satValOffset = remember { derivedStateOf {
-            val hsvArray = floatArrayOf(0f, 0f, 0f)
-            android.graphics.Color.colorToHSV(colorState.value.toArgb(), hsvArray)
-            val offsetX = hsvArray[1] * staValSize.value.width
-            val offsetY = (1f - hsvArray[2]) * staValSize.value.width
-            Offset(offsetX, offsetY)
-        } }
-
-        fun updateValueAndSaturation(offset: Offset, size: IntSize) {
-            val satPoint = 1f / size.width * offset.x
-            val valuePoint = 1f - 1f / size.height * offset.y
-            val hsvArray = floatArrayOf(0f, 0f, 0f)
-            android.graphics.Color.colorToHSV(colorState.value.toArgb(), hsvArray)
-            hsvArray[1] = satPoint
-            hsvArray[2] = valuePoint
-            val color = android.graphics.Color.HSVToColor(hsvArray)
-            colorState.value = Color(color).copy(alpha = colorState.value.alpha)
-        }
-
-        Canvas(
-            modifier = Modifier
-                .size(240.dp)
-                .onSizeChanged {
-                    staValSize.value = it
-                }
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val gesture = awaitFirstDown()
-                        gesture.consume()
-                        updateValueAndSaturation(gesture.position, size)
-                        do {
-                            size
-                            val event = awaitPointerEvent()
-                            val canceled = event.changes.fastAny { it.isConsumed }
-                            if (!canceled) {
-                                event.changes.forEach {
-                                    updateValueAndSaturation(it.position, size)
-                                    it.consume()
-                                }
-                            }
-                        } while (!canceled && event.changes.fastAny { it.pressed })
-                    }
-                }
-        ) {
-
-            val hsvArray = FloatArray(3)
-            android.graphics.Color.colorToHSV(
-                colorState.value.toArgb(),
-                hsvArray,
-            )
-            hsvArray[1] = 1f
-            hsvArray[2] = 1f
-
-            val saturationColor = Color(android.graphics.Color.HSVToColor(hsvArray))
-
-            val saturationShader = LinearGradientShader(
-                from = Offset.Zero,
-                to = Offset(size.width, 0f),
-                colors = listOf(Color(-0x1), saturationColor),
-            )
-            val valueShader = LinearGradientShader(
-                from = Offset.Zero,
-                to = Offset(0f, size.height),
-                colors = listOf(Color(-0x1), Color(-0x1000000)),
-            )
-
-            drawRect(
-                brush = ShaderBrush(
-                    ComposeShader(
-                        valueShader,
-                        saturationShader,
-                        PorterDuff.Mode.MULTIPLY,
-                    )
-                ).apply {
-
-                }
-            )
-
-            drawCircle(Color.White, radius = 20f, center = satValOffset.value, style = Stroke(3f))
-        }
-
-        val canvasSize = remember { mutableStateOf(IntSize.Zero) }
-
-        val selectedColorIndex = remember { derivedStateOf {
-            val hsv = FloatArray(3)
-            android.graphics.Color.colorToHSV(colorState.value.toArgb(), hsv)
-            val selectedHue = hsv[0]
-            selectedHue * canvasSize.value.width / 360f
-        } }
-
-
-        fun updateColor(offset: Offset, size: IntSize) {
-            val fixedOffset = offset.copy(
-                x = offset.x.coerceIn(0f, size.width.toFloat()),
-            )
-            val colorIndex = fixedOffset.x.toInt().coerceAtMost(size.width - 1)
-
-            val hue = colorIndex * 360f / size.width
-            val hsvArray = floatArrayOf(hue, 1f, 1f)
-            val color = android.graphics.Color.HSVToColor(hsvArray)
-            colorState.value = Color(color).copy(alpha = colorState.value.alpha)
-        }
-
-        Canvas(
-            modifier = Modifier.fillMaxWidth().height(20.dp)
-                .onSizeChanged {
-                    canvasSize.value = it
-                }
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val gesture = awaitFirstDown()
-                        gesture.consume()
-                        updateColor(gesture.position, size)
-                        do {
-                            val event = awaitPointerEvent()
-                            val canceled = event.changes.fastAny { it.isConsumed }
-                            if (!canceled) {
-                                event.changes.forEach {
-                                    updateColor(it.position, size)
-                                    it.consume()
-                                }
-                            }
-                        } while (!canceled && event.changes.fastAny { it.pressed })
-                    }
-                }
-        ) {
-            val hsvArray = floatArrayOf(0f, 1f, 1f)
-            val intWidth = size.width.toInt()
-            repeat(intWidth) {
-                val hue = it * 360f / intWidth
-                hsvArray[0] = hue
-                val color = android.graphics.Color.HSVToColor(hsvArray)
-
-                drawLine(
-                    color = Color(color),
-                    start = Offset(it.toFloat(), 0f),
-                    end = Offset(it.toFloat(), size.height),
-                )
-            }
-            drawCircle(Color.White, center = Offset(selectedColorIndex.value.toFloat(), size.height / 2), style = Stroke(3f))
-        }
-
-        Slider(
-            value = colorState.value.alpha,
-            onValueChange = { colorState.value = colorState.value.copy(alpha = it) },
-        )
-
-        Text("Alpha", fontSize = 10.sp)
-    }
-}
-
-@Composable
-fun ColoredCircleButton(
-    modifier: Modifier = Modifier,
-    buttonSize: Dp = 32.dp,
-    color: Color,
-    borderColor: Color,
-    onClick: () -> Unit,
-) {
-    IconButton(onClick = onClick) {
-        val checkCount = 4
-        Box(
-            Modifier
-                .size(buttonSize)
-                .clip(CircleShape)
-                .border(1.dp, borderColor, CircleShape)
-                .drawBehind {
-                    repeat(checkCount) { column ->
-                        repeat(checkCount) { row ->
-                            val w = size.width / checkCount
-                            val h = size.height / checkCount
-                            drawRect(
-                                if ((column + row) % 2 == 0) {
-                                    Color.Gray
-                                } else {
-                                    Color.White
-                                },
-                                topLeft = Offset(column * w, row * h),
-                                size = Size(w, h),
-                            )
-                        }
-                    }
-                }
-                .background(color)
-                .then(modifier)
-        )
-    }
-}
-
-private val Color.inverted: Color
-    get() = Color(1f - red, 1f - green, 1f - blue)
