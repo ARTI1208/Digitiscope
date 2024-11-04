@@ -44,6 +44,7 @@ import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.ExposureZero
 import androidx.compose.material.icons.outlined.GeneratingTokens
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.Rectangle
@@ -180,6 +181,13 @@ fun CanvasScreen(
     val rotationState = remember { mutableFloatStateOf(0f) }
     val pivotState = remember { mutableStateOf(Offset.Zero) }
 
+    fun clearTransformations() {
+        zoomState.floatValue = 1f
+        moveState.value = Offset.Zero
+        rotationState.floatValue = 0f
+        pivotState.value = Offset.Zero
+    }
+
     fun addDrawingItem(drawingItem: DrawingItem) {
         redoItems[currentFrameIndexState.intValue].clear()
         currentDrawingsState.value?.add((drawingItem))
@@ -262,30 +270,20 @@ fun CanvasScreen(
             Size(bitmap.width.toFloat(), bitmap.height.toFloat()),
         ) {
             bitmap.asAndroidBitmap().eraseColor(Color.Transparent.value.toInt())
-//
-//            withTransform({
-//                val zoom = zoomState.floatValue
-//                val translationX = -moveState.value.x * zoom
-//                val translationY = -moveState.value.y * zoom
-//                translate(translationX, translationY)
-//                scale(zoom, zoom)
-//                rotate(rotationState.floatValue, pivotState.value)
-//            }) {
 
-                currentDrawingsState.value?.forEach {
-                    when (it.shape) {
-                        is DrawingShape.PathShape -> drawPath(
-                            it.shape.path,
-                            color = Color(it.color),
-                            style = Stroke(
-                                width = it.shape.strokeWidth,
-                                cap = StrokeCap.Round,
-                            ),
-                            blendMode = it.blendMode,
-                        )
-                    }
+            currentDrawingsState.value?.forEach {
+                when (it.shape) {
+                    is DrawingShape.PathShape -> drawPath(
+                        it.shape.path,
+                        color = Color(it.color),
+                        style = Stroke(
+                            width = it.shape.strokeWidth,
+                            cap = StrokeCap.Round,
+                        ),
+                        blendMode = it.blendMode,
+                    )
                 }
-//            }
+            }
         }
 
         drawingUpdater.intValue++
@@ -422,6 +420,7 @@ fun CanvasScreen(
                 generateFrames = ::generateFrames,
                 deleteCurrentFrame = ::deleteCurrentFrame,
                 deleteAllFrames = ::deleteAllFrames,
+                clearTransformations = ::clearTransformations,
                 export = { config ->
                     exportGif(
                         context = context,
@@ -499,18 +498,8 @@ fun CanvasScreen(
                         }
                 ) {
                     if (currentFrameIndexState.intValue >= 0) {
-//                        DrawingCanvas(
-//                            modifier = Modifier.matchParentSize(),
-//                            colorState = colorState,
-//                            toolState = toolState,
-//                            strokeWidthState = strokeWidthState,
-//                            bitmapState = currentFrameState,
-//                            drawingState = currentDrawingsState,
-//                            isAnimationPlaying = animationPlayingState,
-//                            addDrawingItem = ::addDrawingItem,
-//                        )
 
-                        DrawingCanvas2(
+                        DrawingCanvas(
                             modifier = Modifier.matchParentSize(),
                             colorState = colorState,
                             toolState = toolState,
@@ -558,12 +547,8 @@ fun CanvasScreen(
                             modifier = Modifier.fillMaxWidth(),
                             colorState = colorState,
                             toolState = toolState,
-                        ) {
-                            zoomState.floatValue = 1f
-                            moveState.value = Offset.Zero
-                            rotationState.floatValue = 0f
-                            pivotState.value = Offset.Zero
-                        }
+                            clearTransforms = ::clearTransformations,
+                        )
                     }
                 }
             }
@@ -591,7 +576,7 @@ private fun createDrawingItem(
 }
 
 @Composable
-private fun DrawingCanvas2(
+private fun DrawingCanvas(
     modifier: Modifier = Modifier,
     colorState: State<Color>,
     toolState: State<Tool>,
@@ -724,12 +709,12 @@ private fun DrawingCanvas2(
                                 if (gestureZoom == 1f) {
                                     offset = ((offset + centroid / oldScale).rotateBy(rotation) -
                                             (centroid / newScale + pan / oldScale)).let {
-                                                val maxOffsetX = (size.width * (newScale - 1)) / 2
-                                                val maxOffsetY = (size.height * (newScale - 1)) / 2
-                                                Offset(
-                                                    it.x.coerceIn(-maxOffsetX, maxOffsetX),
-                                                    it.y.coerceIn(-maxOffsetY, maxOffsetY),
-                                                )
+                                        val maxOffsetX = (size.width * (newScale - 1)) / 2
+                                        val maxOffsetY = (size.height * (newScale - 1)) / 2
+                                        Offset(
+                                            it.x.coerceIn(-maxOffsetX, maxOffsetX),
+                                            it.y.coerceIn(-maxOffsetY, maxOffsetY),
+                                        )
                                     }
                                 }
                                 zoom = newScale
@@ -750,7 +735,11 @@ private fun DrawingCanvas2(
             drawImage(bitmap)
         }
         // for redrawing
-        drawText(textMeasurer, drawingUpdater.intValue.toString(), style = TextStyle(color = Color.Transparent))
+        drawText(
+            textMeasurer,
+            drawingUpdater.intValue.toString(),
+            style = TextStyle(color = Color.Transparent)
+        )
     }
 }
 
@@ -814,6 +803,7 @@ fun ControlsRow(
     generateFrames: (Int) -> Unit,
     deleteCurrentFrame: () -> Unit,
     deleteAllFrames: () -> Unit,
+    clearTransformations: () -> Unit,
     export: (config: GifConfig) -> Unit,
     save: (config: GifConfig, path: String) -> Unit,
     redraw: () -> Unit,
@@ -848,6 +838,15 @@ fun ControlsRow(
                         redraw()
                     }) {
                         Icon(Icons.AutoMirrored.Default.Redo, contentDescription = "Redo")
+                    }
+
+                    IconButton(onClick = {
+                        clearTransformations()
+                    }) {
+                        Icon(
+                            Icons.Outlined.ExposureZero,
+                            contentDescription = "Clear transformations",
+                        )
                     }
 
                     IconButton(onClick = {
@@ -979,7 +978,9 @@ fun GenerateFrames(
         var frameCountString by remember { mutableStateOf("") }
         val focusRequester = remember { FocusRequester() }
         TextField(
-            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester),
             value = frameCountString,
             onValueChange = { frameCountString = it },
             singleLine = true,
