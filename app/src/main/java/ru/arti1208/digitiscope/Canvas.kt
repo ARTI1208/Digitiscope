@@ -65,7 +65,6 @@ import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.MutableLongState
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.SnapshotMutationPolicy
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -74,7 +73,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -153,7 +151,7 @@ fun CanvasScreen(
     val currentFrameIndexState = remember { mutableIntStateOf(-1) }
     val previousFrameState =
         remember { derivedStateOf { frames.getOrNull(currentFrameIndexState.intValue - 1) } }
-    val currentFrameState = remember { mutableStateOf(null as ImageBitmap?, policy = neverEqualPolicy()) }
+    val currentFrameState = remember { derivedStateOf { frames[currentFrameIndexState.intValue] } }
 
     val drawings = remember { mutableStateListOf<SnapshotStateList<DrawingItem>>() }
     val currentDrawingsState =
@@ -197,11 +195,6 @@ fun CanvasScreen(
         }
     }
 
-    fun updateSelectedFrameIndex(newIndex: Int) {
-        currentFrameIndexState.intValue = newIndex
-        currentFrameState.value = frames.getOrNull(newIndex)
-    }
-
     fun newFrame() {
         val newIndex = currentFrameIndexState.intValue + 1
         val newFrame = ImageBitmap(frameSizeState.value)
@@ -211,7 +204,7 @@ fun CanvasScreen(
             frameDrawings = mutableStateListOf(),
             frameRedoItems = mutableStateListOf(),
         )
-        updateSelectedFrameIndex(newIndex)
+        currentFrameIndexState.intValue = newIndex
     }
 
     fun copyFrame() {
@@ -250,7 +243,7 @@ fun CanvasScreen(
             frameDrawings = copyDrawings,
             frameRedoItems = copyRedoItems,
         )
-        updateSelectedFrameIndex(newIndex)
+        currentFrameIndexState.intValue = newIndex
     }
 
     fun generateFrames(count: Int) {
@@ -485,7 +478,7 @@ fun CanvasScreen(
                             isAnimationPlaying = animationPlayingState,
                             addDrawingItem = ::addDrawingItem,
                         ) {
-                            val bitmap = currentFrameState.value!!
+                            val bitmap = currentFrameState.value
                             drawScope.draw(
                                 Density(1f),
                                 LayoutDirection.Ltr,
@@ -803,7 +796,7 @@ private fun DrawingCanvas2(
     drawingUpdater: IntState,
     strokeWidthState: FloatState,
     previousBitmapState: State<ImageBitmap?>,
-    bitmapState: State<ImageBitmap?>,
+    bitmapState: State<ImageBitmap>,
     zoomState: MutableFloatState,
     moveState: MutableState<Offset>,
     isAnimationPlaying: State<Boolean>,
@@ -811,7 +804,7 @@ private fun DrawingCanvas2(
     onDraw: () -> Unit,
 ) {
     val previousBitmap = previousBitmapState.value
-    val bitmap = bitmapState.value!!
+    val bitmap = bitmapState.value
     val backgroundImage = ImageBitmap.imageResource(R.drawable.background)
 
     fun Offset.rotateBy(angle: Float): Offset {
