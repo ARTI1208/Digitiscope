@@ -43,11 +43,7 @@ fun Path.applyDrawing(
                 Tool.Shape.Rectangle -> addRect(Rect(originalOffset, lastOffset))
                 Tool.Shape.Square -> addRect(
                     Rect(originalOffset, lastOffset.run {
-                        val length = max(
-                            x - originalOffset.x,
-                            y - originalOffset.y,
-                        )
-                        Size(length, length)
+                        max(x - originalOffset.x, y - originalOffset.y)
                     })
                 )
             }
