@@ -475,29 +475,25 @@ fun CanvasScreen(
                                 fillMaxWidth()
                                     .weight(1f)
                                     .onSizeChanged { newSize ->
-                                        val oldSize = frameSizeState.value
                                         frameSizeState.value = newSize
                                         if (frames.isEmpty()) {
                                             newFrame()
                                         } else {
-                                            if (newSize.height > oldSize.height || newSize.width > oldSize.width) return@onSizeChanged
-
                                             val oldFrames = frames.toList()
                                             frames.clear()
 
                                             frames.addAll(oldFrames.map { oldFrame ->
-                                                if (newSize.height >= oldFrame.height || newSize.width >= oldFrame.width) {
-                                                    return@map oldFrame
+                                                try {
+                                                    Bitmap
+                                                        .createBitmap(
+                                                            oldFrame.asAndroidBitmap(),
+                                                            0, 0,
+                                                            newSize.width, newSize.height,
+                                                        )
+                                                        .asImageBitmap()
+                                                } catch (e: Exception) {
+                                                    oldFrame
                                                 }
-
-                                                println("ass: $oldSize; $newSize; ${oldFrame.height} / ${oldFrame.width}")
-                                                Bitmap
-                                                    .createBitmap(
-                                                        oldFrame.asAndroidBitmap(),
-                                                        0, 0,
-                                                        newSize.width, newSize.height,
-                                                    )
-                                                    .asImageBitmap()
                                             })
                                         }
                                     }
@@ -687,9 +683,6 @@ private fun DrawingCanvas(
                                                         change.previousPosition.withTransforms(),
                                                         change.position.withTransforms(),
                                                     )
-
-                                                    val z = zoom
-                                                    val o = offset
 
                                                     onDraw()
                                                 } else {
