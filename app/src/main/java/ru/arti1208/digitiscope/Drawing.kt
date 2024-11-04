@@ -6,6 +6,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import ru.arti1208.digitiscope.model.Tool
 import kotlin.math.max
+import kotlin.math.min
 
 fun Path.applyDrawing(
     tool: Tool,
@@ -33,14 +34,30 @@ fun Path.applyDrawing(
                     lastOffset.y
                 )
 
-                Tool.Shape.Oval -> addOval(Rect(originalOffset, lastOffset))
+                Tool.Shape.Oval -> {
+                    val left = min(originalOffset.x, lastOffset.x)
+                    val top = min(originalOffset.y, lastOffset.y)
+                    val right = max(originalOffset.x, lastOffset.x)
+                    val bottom = max(originalOffset.y, lastOffset.y)
+                    val rect = Rect(left, top, right, bottom)
+
+                    addOval(rect)
+                }
                 Tool.Shape.Circle -> addOval(
                     Rect(originalOffset, lastOffset.run {
                         max(x - originalOffset.x, y - originalOffset.y)
                     })
                 )
 
-                Tool.Shape.Rectangle -> addRect(Rect(originalOffset, lastOffset))
+                Tool.Shape.Rectangle -> {
+                    val left = min(originalOffset.x, lastOffset.x)
+                    val top = min(originalOffset.y, lastOffset.y)
+                    val right = max(originalOffset.x, lastOffset.x)
+                    val bottom = max(originalOffset.y, lastOffset.y)
+                    val rect = Rect(left, top, right, bottom)
+
+                    addRect(rect)
+                }
                 Tool.Shape.Square -> addRect(
                     Rect(originalOffset, lastOffset.run {
                         max(x - originalOffset.x, y - originalOffset.y)
