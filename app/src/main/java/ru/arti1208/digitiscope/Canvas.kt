@@ -52,6 +52,7 @@ import androidx.compose.material.icons.outlined.Square
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -1021,7 +1022,7 @@ fun ToolsRow(
         item {
             ColoredCircleButton(
                 color = colorState.value,
-                borderColor = Color.Transparent,
+                borderColor = MaterialTheme.colorScheme.onSurface,
                 onClick = { showColorPickerState.value = true },
             )
 

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -69,7 +70,7 @@ fun ColorPicker(
         FlowRow {
             ColoredCircleButton(
                 color = colorState.value,
-                borderColor = Color.Transparent,
+                borderColor = MaterialTheme.colorScheme.onSurface,
                 onClick = { },
             )
         }

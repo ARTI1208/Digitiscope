@@ -106,6 +106,7 @@ fun ExportDialog(
                                     .run {
                                         if (isBackgroundFromEditor) {
                                             border(1.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                                .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
                                         } else {
                                             this
                                         }
